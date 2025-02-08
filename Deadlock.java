@@ -53,7 +53,7 @@ public class Deadlock {
     }
 
     private static void forceDeadlock(int threadId, int productId1, int productId2) throws SQLException {
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = ConexionBD.getConnection()) {
             // Configurar la transacción con aislamiento SERIALIZABLE
             connection.setAutoCommit(false);
             connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);

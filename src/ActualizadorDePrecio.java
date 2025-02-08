@@ -1,14 +1,9 @@
 import javax.swing.*;
-import java.awt.BorderLayout;
+import java.awt.*;
 import java.sql.*;
 
 public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
-    private JDialog progressDialog;
-
-    @Override
-    protected void done() {
-        progressDialog.dispose();
-    }
+    private final JDialog progressDialog = createProgressDialog();
 
     @Override
     protected Void doInBackground() throws Exception {
@@ -17,36 +12,37 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
             JOptionPane.showMessageDialog(null, "Debe ingresar un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
             return null;
         }
-
-        progressDialog = createProgressDialog("Actualizando precio...");
         SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
-
-        try (Connection connection = ConexionBD.getConnection()) {
-            String procedureCall = "{CALL ActualizarPrecios(?, ?)}";
-
-            try (CallableStatement stmt = connection.prepareCall(procedureCall)) {
-                stmt.setString(1, "IDPRODUCTO");
-                stmt.setInt(2, Integer.parseInt(productId));
-                stmt.execute();
-                JOptionPane.showMessageDialog(null, "Precio actualizado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-            }
-        }
+        actualizarPrecio(productId);
         return null;
     }
 
-    private JDialog createProgressDialog(String message) {
-        JDialog progressDialog = new JDialog();
-        progressDialog.setLayout(new BorderLayout());
-        progressDialog.setSize(300, 100);
-        progressDialog.setLocationRelativeTo(null);
+    @Override
+    protected void done() {
+        progressDialog.dispose();
+    }
 
-        JLabel label = new JLabel(message, JLabel.CENTER);
+    private void actualizarPrecio(String productId) {
+        try (Connection connection = ConexionBD.getConnection();
+             CallableStatement stmt = connection.prepareCall("{CALL ActualizarPrecios(?, ?)}")) {
+            stmt.setString(1, "IDPRODUCTO");
+            stmt.setInt(2, Integer.parseInt(productId));
+            stmt.execute();
+            JOptionPane.showMessageDialog(null, "Precio actualizado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al actualizar precio: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private JDialog createProgressDialog() {
+        JDialog dialog = new JDialog();
+        dialog.setLayout(new BorderLayout());
+        dialog.setSize(300, 100);
+        dialog.setLocationRelativeTo(null);
+        dialog.add(new JLabel("Actualizando precio...", JLabel.CENTER), BorderLayout.NORTH);
         JProgressBar progressBar = new JProgressBar();
         progressBar.setIndeterminate(true);
-
-        progressDialog.add(label, BorderLayout.NORTH);
-        progressDialog.add(progressBar, BorderLayout.CENTER);
-
-        return progressDialog;
+        dialog.add(progressBar, BorderLayout.CENTER);
+        return dialog;
     }
 }

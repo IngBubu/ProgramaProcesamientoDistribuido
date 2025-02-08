@@ -48,7 +48,7 @@ public class Aplazamiento {
         Thread.currentThread().setPriority(priority);
     
         for (int attempt = 1; attempt <= 20; attempt++) {
-            try (Connection connection = DatabaseConnection.getConnection()) {
+            try (Connection connection = ConexionBD.getConnection()) {
                 connection.setAutoCommit(false);
                 connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
     

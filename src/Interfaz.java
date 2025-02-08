@@ -48,7 +48,7 @@ public class Interfaz extends JFrame {
         add(bottomContainer, BorderLayout.CENTER);
 
         // Acciones de los botones
-        btnCarga.addActionListener(e -> new DataLoader(tablaCarga).execute());
+        btnCarga.addActionListener(e -> new CargaDeDatos(tablaCarga).execute());
         verifyButton.addActionListener(e -> new VerificadorDeProducto(tablaVerificacion).execute());
         btnIncrementarPrecio.addActionListener(e -> new ActualizadorDePrecio().execute());
     }
