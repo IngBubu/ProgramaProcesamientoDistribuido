@@ -6,263 +6,203 @@ import javax.swing.table.DefaultTableModel;
 public class MainGUI extends JFrame {
     private JTable table;
     private JTable verificationTable;
-    private JButton updateButton;
     private JButton loadAllButton;
     private JButton verifyButton;
     private JButton incrementPriceButton;
-    private JButton decrementPriceButton;
 
     public MainGUI() {
         setTitle("Actualización Distribuida de Precios");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new GridLayout(2, 1)); // Dividir la ventana en dos mitades
+        setLayout(new BorderLayout());
 
-        // Panel superior con tabla principal y botón de carga
+        // Panel superior (tabla principal con proporción 30%)
         JPanel topPanel = new JPanel(new BorderLayout());
         loadAllButton = new JButton("Cargar Todo");
         table = new JTable();
 
         topPanel.add(new JScrollPane(table), BorderLayout.CENTER);
         topPanel.add(loadAllButton, BorderLayout.NORTH);
-        add(topPanel);
 
-        // Panel inferior con tabla de verificación y botones
+        // Asignar altura proporcional al panel superior
+        JPanel topContainer = new JPanel(new BorderLayout());
+        topContainer.setPreferredSize(new Dimension(800, 420)); // 30% de la altura total
+        topContainer.add(topPanel);
+
+        add(topContainer, BorderLayout.NORTH);
+
+        // Panel inferior (tabla de verificación con proporción 70%)
         JPanel bottomPanel = new JPanel(new BorderLayout());
         verifyButton = new JButton("Verificar Producto");
-        incrementPriceButton = new JButton("Incrementar Precio");
-        decrementPriceButton = new JButton("Decrementar Precio");
+        incrementPriceButton = new JButton("Actualizar Precio"); // Cambiar el texto para mayor claridad
         verificationTable = new JTable();
 
         JPanel buttonPanel = new JPanel(new FlowLayout());
-        buttonPanel.add(decrementPriceButton);
         buttonPanel.add(verifyButton);
         buttonPanel.add(incrementPriceButton);
 
         bottomPanel.add(new JScrollPane(verificationTable), BorderLayout.CENTER);
         bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
-        add(bottomPanel);
 
-        // Agregar acción al botón de carga
-        loadAllButton.addActionListener(e -> loadAllTableData());
+        // Asignar altura proporcional al panel inferior
+        JPanel bottomContainer = new JPanel(new BorderLayout());
+        bottomContainer.setPreferredSize(new Dimension(800, 180)); // 70% de la altura total
+        bottomContainer.add(bottomPanel);
 
-        // Agregar acción al botón de verificación
-        verifyButton.addActionListener(e -> verifyProductData());
+        add(bottomContainer, BorderLayout.CENTER);
 
-        // Agregar acción al botón de incremento de precio
-        incrementPriceButton.addActionListener(e -> incrementProductPrice());
-
-        // Agregar acción al botón de decremento de precio
-        decrementPriceButton.addActionListener(e -> decrementProductPrice());
+        // Acciones de los botones
+        loadAllButton.addActionListener(e -> new LoadDataWorker().execute());
+        verifyButton.addActionListener(e -> new VerifyProductWorker().execute());
+        incrementPriceButton.addActionListener(e -> new UpdatePriceWorker().execute()); // Actualización con ID del producto
     }
 
-    private void loadAllTableData() {
-        try (Connection connection = DatabaseConnection.getConnection()) {
-            String query = "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL " +
-                    "FROM TICKETSD TSD " +
-                    "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "WHERE TSH.IDESTADO IN (" +
-                    "    SELECT IDESTADO " +
-                    "    FROM TICKETSH " +
-                    "    GROUP BY IDESTADO " +
-                    "    HAVING COUNT(*) >= 5" +
-                    ") " +
-                    "AND TSH.IDESTADO IN (" +
-                    "    SELECT TSH.IDESTADO " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    GROUP BY TSH.IDESTADO " +
-                    "    HAVING AVG(TSD.TOTAL) > 1000" +
-                    ") " +
-                    "AND TSH.IDCIUDAD IN (" +
-                    "    SELECT TSH.IDCIUDAD " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    GROUP BY TSH.IDCIUDAD " +
-                    "    HAVING AVG(TSD.TOTAL) > 2000" +
-                    ")";
-            
-            try (PreparedStatement stmt = connection.prepareStatement(query);
-                 ResultSet rs = stmt.executeQuery()) {
-                DefaultTableModel model = new DefaultTableModel();
-                table.setModel(model);
+    // Ventana flotante con barra de progreso
+    private JDialog createProgressDialog(String message) {
+        JDialog progressDialog = new JDialog(this, "Procesando", true);
+        progressDialog.setLayout(new BorderLayout());
+        progressDialog.setSize(300, 100);
+        progressDialog.setLocationRelativeTo(this);
 
-                ResultSetMetaData metaData = rs.getMetaData();
-                int columnCount = metaData.getColumnCount();
+        JLabel label = new JLabel(message, JLabel.CENTER);
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
 
-                for (int i = 1; i <= columnCount; i++) {
-                    model.addColumn(metaData.getColumnName(i));
-                }
+        progressDialog.add(label, BorderLayout.NORTH);
+        progressDialog.add(progressBar, BorderLayout.CENTER);
 
-                boolean hasData = false;
-                while (rs.next()) {
-                    hasData = true;
-                    Object[] row = new Object[columnCount];
-                    for (int i = 1; i <= columnCount; i++) {
-                        row[i - 1] = rs.getObject(i);
-                    }
-                    model.addRow(row);
-                }
-                
-                if (!hasData) {
-                    JOptionPane.showMessageDialog(this, "Ningún Producto Cumple con los requisitos para ser actualizado", "Aviso", JOptionPane.WARNING_MESSAGE);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error al cargar los datos: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        return progressDialog;
     }
 
-    private void verifyProductData() {
-        String productId = JOptionPane.showInputDialog(this, "Ingrese el ID del Producto a verificar:", "Verificar Producto", JOptionPane.QUESTION_MESSAGE);
+    // Clase para cargar todos los datos con ventana flotante
+    private class LoadDataWorker extends SwingWorker<Void, Void> {
+        private JDialog progressDialog;
 
-        if (productId == null || productId.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Debe ingresar un ID de Producto válido.", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
+        @Override
+        protected void done() {
+            progressDialog.dispose();
         }
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
-            String query = "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL, TSH.IDESTADO, TSH.IDCIUDAD " +
-                    "FROM TICKETSD TSD " +
-                    "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "WHERE TSD.IDPRODUCTO = ? " +
-                    "AND TSH.IDESTADO IN (" +
-                    "    SELECT IDESTADO " +
-                    "    FROM TICKETSH " +
-                    "    GROUP BY IDESTADO " +
-                    "    HAVING COUNT(*) >= 5" +
-                    ") " +
-                    "AND TSH.IDESTADO IN (" +
-                    "    SELECT TSH.IDESTADO " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    GROUP BY TSH.IDESTADO " +
-                    "    HAVING AVG(TSD.TOTAL) > 1000" +
-                    ") " +
-                    "AND TSH.IDCIUDAD IN (" +
-                    "    SELECT TSH.IDCIUDAD " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    GROUP BY TSH.IDCIUDAD " +
-                    "    HAVING AVG(TSD.TOTAL) > 2000" +
-                    ")";
-            
-            try (PreparedStatement stmt = connection.prepareStatement(query)) {
-                stmt.setString(1, productId);
-                try (ResultSet rs = stmt.executeQuery()) {
+        @Override
+        protected Void doInBackground() throws Exception {
+            progressDialog = createProgressDialog("Cargando datos...");
+            SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
+
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                String query = "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL FROM TICKETSD TSD " +
+                        "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO";
+
+                try (PreparedStatement stmt = connection.prepareStatement(query);
+                     ResultSet rs = stmt.executeQuery()) {
                     DefaultTableModel model = new DefaultTableModel();
-                    verificationTable.setModel(model);
+                    table.setModel(model);
 
                     ResultSetMetaData metaData = rs.getMetaData();
                     int columnCount = metaData.getColumnCount();
-
                     for (int i = 1; i <= columnCount; i++) {
                         model.addColumn(metaData.getColumnName(i));
                     }
 
-                    boolean hasData = false;
                     while (rs.next()) {
-                        hasData = true;
                         Object[] row = new Object[columnCount];
                         for (int i = 1; i <= columnCount; i++) {
                             row[i - 1] = rs.getObject(i);
                         }
                         model.addRow(row);
                     }
-                    
-                    if (!hasData) {
-                        JOptionPane.showMessageDialog(this, "El producto con ID " + productId + " no cumple con los requisitos o no tiene ventas registradas.", "Aviso", JOptionPane.WARNING_MESSAGE);
+                }
+            }
+            return null;
+        }
+    }
+
+    // Clase para verificar un producto con ventana flotante
+    private class VerifyProductWorker extends SwingWorker<Void, Void> {
+        private JDialog progressDialog;
+
+        @Override
+        protected void done() {
+            progressDialog.dispose();
+        }
+
+        @Override
+        protected Void doInBackground() throws Exception {
+            String productId = JOptionPane.showInputDialog("Ingrese el ID del Producto a verificar:");
+            if (productId == null || productId.trim().isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Debe ingresar un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
+                return null;
+            }
+
+            progressDialog = createProgressDialog("Verificando producto...");
+            SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
+
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                String query = "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL FROM TICKETSD TSD " +
+                        "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO WHERE TSD.IDPRODUCTO = ?";
+
+                try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                    stmt.setString(1, productId);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        DefaultTableModel model = new DefaultTableModel();
+                        verificationTable.setModel(model);
+
+                        ResultSetMetaData metaData = rs.getMetaData();
+                        int columnCount = metaData.getColumnCount();
+                        for (int i = 1; i <= columnCount; i++) {
+                            model.addColumn(metaData.getColumnName(i));
+                        }
+
+                        while (rs.next()) {
+                            Object[] row = new Object[columnCount];
+                            for (int i = 1; i <= columnCount; i++) {
+                                row[i - 1] = rs.getObject(i);
+                            }
+                            model.addRow(row);
+                        }
                     }
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error al consultar el producto: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return null;
         }
     }
 
-    private void incrementProductPrice() {
-        try (Connection connection = DatabaseConnection.getConnection()) {
-            String updateQuery = "UPDATE TICKETSD " +
-                    "SET PRECIO = PRECIO + 1 " +
-                    "WHERE FOLIO IN (" +
-                    "    SELECT TSD.FOLIO " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    WHERE TSH.IDESTADO IN (" +
-                    "        SELECT IDESTADO " +
-                    "        FROM TICKETSH " +
-                    "        GROUP BY IDESTADO " +
-                    "        HAVING COUNT(*) >= 5" +
-                    "    ) " +
-                    "    AND TSH.IDESTADO IN (" +
-                    "        SELECT TSH.IDESTADO " +
-                    "        FROM TICKETSD TSD " +
-                    "        JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "        GROUP BY TSH.IDESTADO " +
-                    "        HAVING AVG(TSD.TOTAL) > 1000" +
-                    "    ) " +
-                    "    AND TSH.IDCIUDAD IN (" +
-                    "        SELECT TSH.IDCIUDAD " +
-                    "        FROM TICKETSD TSD " +
-                    "        JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "        GROUP BY TSH.IDCIUDAD " +
-                    "        HAVING AVG(TSD.TOTAL) > 2000" +
-                    "    )" +
-                    ")";
-
-            try (PreparedStatement stmt = connection.prepareStatement(updateQuery)) {
-                int rowsUpdated = stmt.executeUpdate();
-                JOptionPane.showMessageDialog(this, rowsUpdated + " productos han sido actualizados.", "Actualización Exitosa", JOptionPane.INFORMATION_MESSAGE);
-                loadAllTableData(); // Recargar datos
+    private class UpdatePriceWorker extends SwingWorker<Void, Void> {
+        private JDialog progressDialog;
+    
+        @Override
+        protected void done() {
+            progressDialog.dispose();
+        }
+    
+        @Override
+        protected Void doInBackground() throws Exception {
+            String productId = JOptionPane.showInputDialog("Ingrese el ID del Producto a actualizar:");
+            if (productId == null || productId.trim().isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Debe ingresar un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
+                return null;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error al actualizar los precios: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void decrementProductPrice() {
-        try (Connection connection = DatabaseConnection.getConnection()) {
-            String updateQuery = "UPDATE TICKETSD " +
-                    "SET PRECIO = PRECIO - 1 " +
-                    "WHERE FOLIO IN (" +
-                    "    SELECT TSD.FOLIO " +
-                    "    FROM TICKETSD TSD " +
-                    "    JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "    WHERE TSH.IDESTADO IN (" +
-                    "        SELECT IDESTADO " +
-                    "        FROM TICKETSH " +
-                    "        GROUP BY IDESTADO " +
-                    "        HAVING COUNT(*) >= 5" +
-                    "    ) " +
-                    "    AND TSH.IDESTADO IN (" +
-                    "        SELECT TSH.IDESTADO " +
-                    "        FROM TICKETSD TSD " +
-                    "        JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "        GROUP BY TSH.IDESTADO " +
-                    "        HAVING AVG(TSD.TOTAL) > 1000" +
-                    "    ) " +
-                    "    AND TSH.IDCIUDAD IN (" +
-                    "        SELECT TSH.IDCIUDAD " +
-                    "        FROM TICKETSD TSD " +
-                    "        JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
-                    "        GROUP BY TSH.IDCIUDAD " +
-                    "        HAVING AVG(TSD.TOTAL) > 2000" +
-                    "    )" +
-                    ")";
-
-            try (PreparedStatement stmt = connection.prepareStatement(updateQuery)) {
-                int rowsUpdated = stmt.executeUpdate();
-                JOptionPane.showMessageDialog(this, rowsUpdated + " productos han sido actualizados.", "Actualización Exitosa", JOptionPane.INFORMATION_MESSAGE);
-                loadAllTableData(); // Recargar datos
+    
+            progressDialog = createProgressDialog("Actualizando precio...");
+            SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
+    
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                String procedureCall = "{CALL ActualizarPrecios(?, ?)}"; // Llamar al procedimiento con dos parámetros
+    
+                try (CallableStatement stmt = connection.prepareCall(procedureCall)) {
+                    stmt.setString(1, "IDPRODUCTO"); // Indica que se está usando el ID del producto
+                    stmt.setInt(2, Integer.parseInt(productId)); // Convierte el ID ingresado a entero
+                    stmt.execute();
+                    JOptionPane.showMessageDialog(null, "Precio actualizado correctamente para el producto " + productId, "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Error al actualizar el precio: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error al actualizar los precios: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return null;
         }
     }
+    
+
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -272,11 +212,10 @@ public class MainGUI extends JFrame {
     }
 }
 
-
 class DatabaseConnection {
     private static final String URL = "jdbc:sqlserver://localhost:1433;databaseName=Empresa;encrypt=true;trustServerCertificate=true";
-    private static final String USER = "sa"; // Cambia esto por tu usuario
-    private static final String PASSWORD = "123456789"; // Cambia esto por tu contraseña
+    private static final String USER = "sa";
+    private static final String PASSWORD = "123456789";
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASSWORD);
