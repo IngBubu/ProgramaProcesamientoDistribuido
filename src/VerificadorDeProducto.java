@@ -3,11 +3,11 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.sql.*;
 
-public class ProductVerifier extends SwingWorker<Void, Void> {
+public class VerificadorDeProducto extends SwingWorker<Void, Void> {
     private JTable verificationTable;
     private JDialog progressDialog;
 
-    public ProductVerifier(JTable verificationTable) {
+    public VerificadorDeProducto(JTable verificationTable) {
         this.verificationTable = verificationTable;
     }
 
@@ -27,7 +27,7 @@ public class ProductVerifier extends SwingWorker<Void, Void> {
         progressDialog = createProgressDialog("Verificando producto...");
         SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = ConexionBD.getConnection()) {
             String query = "SELECT * FROM TICKETSD WHERE IDPRODUCTO = ?";
 
             try (PreparedStatement stmt = connection.prepareStatement(query)) {

@@ -22,7 +22,7 @@ public class DataLoader extends SwingWorker<Void, Void> {
         progressDialog = createProgressDialog("Cargando datos...");
         SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = ConexionBD.getConnection()) {
             String query = "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL FROM TICKETSD TSD " +
                     "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO";
 

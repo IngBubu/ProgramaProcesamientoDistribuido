@@ -1,9 +1,8 @@
 import javax.swing.*;
-
 import java.awt.BorderLayout;
 import java.sql.*;
 
-public class PriceUpdater extends SwingWorker<Void, Void> {
+public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
     private JDialog progressDialog;
 
     @Override
@@ -22,7 +21,7 @@ public class PriceUpdater extends SwingWorker<Void, Void> {
         progressDialog = createProgressDialog("Actualizando precio...");
         SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = ConexionBD.getConnection()) {
             String procedureCall = "{CALL ActualizarPrecios(?, ?)}";
 
             try (CallableStatement stmt = connection.prepareCall(procedureCall)) {
