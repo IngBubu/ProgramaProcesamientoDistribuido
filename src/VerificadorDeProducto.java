@@ -30,7 +30,12 @@ public class VerificadorDeProducto extends SwingWorker<Void, Void> {
 
     private void verificarProducto(String productId) {
         try (Connection connection = ConexionBD.getConnection();
-             PreparedStatement stmt = connection.prepareStatement("SELECT * FROM TICKETSD WHERE IDPRODUCTO = ?")) {
+             PreparedStatement stmt = connection.prepareStatement(
+                     "SELECT TSD.FOLIO, TSD.IDPRODUCTO, TSD.UNIDADES, TSD.PRECIO, TSD.TOTAL, " +
+                             "TSH.IDEMPLEADO, TSH.IDTIENDA, TSH.IDESTADO, TSH.IDCIUDAD " +
+                             "FROM TICKETSD TSD " +
+                             "JOIN TICKETSH TSH ON TSD.FOLIO = TSH.FOLIO " +
+                             "WHERE TSD.IDPRODUCTO = ?")) {
             stmt.setString(1, productId);
             try (ResultSet rs = stmt.executeQuery()) {
                 DefaultTableModel model = new DefaultTableModel();

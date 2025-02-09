@@ -7,13 +7,26 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
 
     @Override
     protected Void doInBackground() throws Exception {
-        String productId = JOptionPane.showInputDialog("Ingrese el ID del Producto a actualizar:");
-        if (productId == null || productId.trim().isEmpty()) {
+        String[] opciones = {"IDPRODUCTO", "IDEMPLEADO", "IDCIUDAD"};
+        String criterio = (String) JOptionPane.showInputDialog(null, "Seleccione el criterio de actualización:",
+                "Actualizar Precio", JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
+
+        if (criterio == null) return null;
+
+        String criterioId = JOptionPane.showInputDialog("Ingrese el valor para " + criterio + ":");
+        if (criterioId == null || criterioId.trim().isEmpty()) {
             JOptionPane.showMessageDialog(null, "Debe ingresar un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
             return null;
         }
+
+        String productId = JOptionPane.showInputDialog("Ingrese el ID del Producto a actualizar:");
+        if (productId == null || productId.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(null, "Debe ingresar un ID de producto válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+
         SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
-        actualizarPrecio(productId);
+        actualizarPrecio(criterio, criterioId, productId);
         return null;
     }
 
@@ -22,11 +35,12 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
         progressDialog.dispose();
     }
 
-    private void actualizarPrecio(String productId) {
+    private void actualizarPrecio(String criterio, String criterioId, String productId) {
         try (Connection connection = ConexionBD.getConnection();
-             CallableStatement stmt = connection.prepareCall("{CALL ActualizarPrecios(?, ?)}")) {
-            stmt.setString(1, "IDPRODUCTO");
-            stmt.setInt(2, Integer.parseInt(productId));
+             CallableStatement stmt = connection.prepareCall("{CALL ActualizarPrecios(?, ?, ?)}")) {
+            stmt.setString(1, criterio);
+            stmt.setInt(2, Integer.parseInt(criterioId));
+            stmt.setInt(3, Integer.parseInt(productId));
             stmt.execute();
             JOptionPane.showMessageDialog(null, "Precio actualizado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {

@@ -1,5 +1,7 @@
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.sql.*;
 
 public class Interfaz extends JFrame {
     private JTable tablaCarga;
