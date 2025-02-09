@@ -1,0 +1,44 @@
+# README - Proyecto Procesamiento Distribuido
+
+## Descripción del Proyecto
+Este proyecto implementa un sistema de procesamiento distribuido para la actualización de precios de productos en la base de datos `Empresa`. Utiliza una arquitectura cliente-servidor donde múltiples nodos pueden ejecutar operaciones concurrentes sobre los datos. El sistema está desarrollado en **Java con Swing** para la interfaz gráfica y se conecta a **SQL Server 2022** a través de JDBC.
+
+## Características Principales
+- **Carga y Verificación de Datos:** Se permite la carga de los datos desde archivos CSV y su validación.
+- **Procesamiento Distribuido:** Se ejecutan múltiples operaciones concurrentes para actualizar los precios de los productos.
+- **Control de Concurrencia:** Se implementan mecanismos para evitar problemas como `deadlocks` y `starvation`.
+- **Interfaz Gráfica:** Basada en **Java Swing**, permite la interacción con la base de datos de forma intuitiva.
+
+## Requisitos
+- **Java 11 o superior**
+- **SQL Server 2022**
+- **Bibliotecas necesarias:**
+  - `java.sql.*`
+  - `javax.swing.*`
+  - `pandas` y `tkinter` (para preprocesamiento de datos en Python)
+
+
+## Funcionamiento del Sistema
+### 1. Carga de Datos
+El sistema carga los datos de los archivos `TicketD.csv` y `TicketH.csv`, asegurando su correcta validación y transformación.
+
+### 2. Procesamiento Distribuido
+Los nodos ejecutan concurrentemente la actualización de precios en base a criterios específicos. Se utilizan transacciones con aislamiento **SERIALIZABLE** para garantizar la integridad.
+
+### 3. Manejo de Concurrencia
+- **Deadlocks:** Se generan cuando múltiples hilos bloquean recursos en distinto orden. Se previenen usando un orden estricto en los bloqueos.
+- **Aplazamiento Indefinido:** Se evita mediante un sistema de prioridades para que todos los procesos tengan oportunidad de ejecución.
+
+## Ejecución del Proyecto
+1. Configurar SQL Server e importar los archivos SQL en la carpeta `sql/`.
+2. Compilar y ejecutar `main.java` para iniciar la interfaz gráfica.
+3. Cargar los datos en la base de datos desde la interfaz.
+4. Ejecutar las actualizaciones de precios desde múltiples instancias para simular concurrencia.
+
+## Notas Adicionales
+- Se recomienda ejecutar los scripts Python antes de importar los datos a SQL Server.
+- En caso de deadlock, SQL Server automáticamente detecta y resuelve el problema abortando una transacción.
+
+---
+Este README proporciona una visión general del proyecto. Para detalles adicionales, consulta la documentación interna del código.
+
