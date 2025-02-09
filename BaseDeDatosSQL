@@ -1,0 +1,110 @@
+-- Creación de la base de datos
+CREATE DATABASE Empresa;
+GO
+
+USE Empresa;
+GO
+
+-- Tabla TICKETSH (Encabezado de tickets)
+CREATE TABLE TICKETSH (
+    FOLIO VARCHAR(8) NOT NULL PRIMARY KEY,
+    FECHA DATE NOT NULL,
+    IDESTADO INT NOT NULL,
+    IDCIUDAD INT NOT NULL,
+    IDTIENDA INT NOT NULL,
+    IDEMPLEADO INT NOT NULL
+);
+GO
+
+-- Tabla TICKETSD (Detalles de tickets)
+CREATE TABLE TICKETSD (
+    FOLIO VARCHAR(8) NOT NULL,
+    IDPRODUCTO INT NOT NULL,
+    UNIDADES INT NOT NULL CHECK (UNIDADES > 0),
+    PRECIO INT NOT NULL CHECK (PRECIO >= 0),
+    TOTAL INT NOT NULL,
+    PRIMARY KEY (FOLIO, IDPRODUCTO),
+    FOREIGN KEY (FOLIO) REFERENCES TICKETSH(FOLIO) ON DELETE CASCADE
+);
+GO
+
+-- Índices para mejorar el rendimiento
+CREATE INDEX idx_estado ON TICKETSH(IDESTADO);
+CREATE INDEX idx_ciudad ON TICKETSH(IDCIUDAD);
+CREATE INDEX idx_tienda ON TICKETSH(IDTIENDA);
+CREATE INDEX idx_empleado ON TICKETSH(IDEMPLEADO);
+CREATE INDEX idx_producto ON TICKETSD(IDPRODUCTO);
+CREATE INDEX idx_ticket_precio ON TICKETSD(FOLIO, PRECIO);
+CREATE INDEX idx_ticket_total ON TICKETSD(FOLIO, TOTAL);
+GO
+
+-- Verificación de integridad de los datos
+ALTER TABLE TICKETSD ADD CONSTRAINT chk_precio CHECK (PRECIO > 0);
+GO
+
+
+-----Insersiones masivas a las tablas
+BULK INSERT TICKETSH
+FROM 'C:\TESEBADA\CSV\TicketH.csv'
+WITH
+(
+    FIELDTERMINATOR = ',', 
+    ROWTERMINATOR = '\n',  
+    FIRSTROW = 2           
+);
+
+BULK INSERT TICKETSD
+FROM 'C:\TESEBADA\CSV\TicketD.csv'
+WITH
+(
+    FIELDTERMINATOR = ',', 
+    ROWTERMINATOR = '\n',   
+    FIRSTROW = 2           
+);
+
+
+-- Procedimiento almacenado para actualizar el precio de un producto específico
+CREATE OR ALTER PROCEDURE ActualizarPrecios
+    @criterio VARCHAR(20), -- Criterio a usar (Ejemplo: 'IDTIENDA', 'IDEMPLEADO', 'IDCIUDAD')
+    @valor INT,            -- Valor del criterio (ID de tienda, empleado o ciudad)
+    @idProducto INT        -- ID del producto a actualizar
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    BEGIN TRANSACTION;
+
+    IF @criterio = 'IDTIENDA'
+    BEGIN
+        UPDATE TICKETSD
+        SET PRECIO = PRECIO + 1
+        WHERE IDPRODUCTO = @idProducto AND FOLIO IN (
+            SELECT FOLIO FROM TICKETSH WHERE IDTIENDA = @valor
+        );
+    END
+    ELSE IF @criterio = 'IDEMPLEADO'
+    BEGIN
+        UPDATE TICKETSD
+        SET PRECIO = PRECIO + 1
+        WHERE IDPRODUCTO = @idProducto AND FOLIO IN (
+            SELECT FOLIO FROM TICKETSH WHERE IDEMPLEADO = @valor
+        );
+    END
+    ELSE IF @criterio = 'IDCIUDAD'
+    BEGIN
+        UPDATE TICKETSD
+        SET PRECIO = PRECIO + 1
+        WHERE IDPRODUCTO = @idProducto AND FOLIO IN (
+            SELECT FOLIO FROM TICKETSH WHERE IDCIUDAD = @valor
+        );
+    END
+    ELSE
+    BEGIN
+        RAISERROR('Criterio no válido.', 16, 1);
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+
+    COMMIT TRANSACTION;
+END;
+GO
+
