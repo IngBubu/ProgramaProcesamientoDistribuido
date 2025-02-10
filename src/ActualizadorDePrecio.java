@@ -7,7 +7,7 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Void> {
 
     @Override
     protected Void doInBackground() throws Exception {
-        String[] opciones = {"IDPRODUCTO", "IDEMPLEADO", "IDCIUDAD"};
+        String[] opciones = {"IDTIENDA", "IDEMPLEADO", "IDCIUDAD"};
         String criterio = (String) JOptionPane.showInputDialog(null, "Seleccione el criterio de actualización:",
                 "Actualizar Precio", JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
 
