@@ -5,10 +5,13 @@ import java.sql.*;
 
 public class Interfaz extends JFrame {
     private JTable tablaCarga;
-    private JTable tablaVerificacion;
-    private JButton btnCarga;
-    private JButton verifyButton;
+    private JButton btnCargarDatos;
     private JButton btnIncrementarPrecio;
+    private JRadioButton rbtnTienda, rbtnEmpleado, rbtnCiudad;
+    private JComboBox<Integer> comboBoxCriterio;
+    private ButtonGroup criterioGroup;
+    private JProgressBar progressBar;
+    private JLabel lblEstado;
 
     public Interfaz() {
         setTitle("Actualización Distribuida de Precios");
@@ -16,42 +19,98 @@ public class Interfaz extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Panel superior (tabla principal)
-        JPanel topPanel = new JPanel(new BorderLayout());
-        btnCarga = new JButton("Cargar Todo");
-        tablaCarga = new JTable();
+        // Panel de selección de criterio (ahora en la parte superior)
+        JPanel topPanel = new JPanel(new FlowLayout());
+        rbtnTienda = new JRadioButton("IDTIENDA");
+        rbtnEmpleado = new JRadioButton("IDEMPLEADO");
+        rbtnCiudad = new JRadioButton("IDCIUDAD");
+        criterioGroup = new ButtonGroup();
+        criterioGroup.add(rbtnTienda);
+        criterioGroup.add(rbtnEmpleado);
+        criterioGroup.add(rbtnCiudad);
+        comboBoxCriterio = new JComboBox<>();
+        btnCargarDatos = new JButton("Cargar Datos");
 
-        topPanel.add(new JScrollPane(tablaCarga), BorderLayout.CENTER);
-        topPanel.add(btnCarga, BorderLayout.NORTH);
+        topPanel.add(new JLabel("Seleccione criterio:"));
+        topPanel.add(rbtnTienda);
+        topPanel.add(rbtnEmpleado);
+        topPanel.add(rbtnCiudad);
+        topPanel.add(comboBoxCriterio);
+        topPanel.add(btnCargarDatos);
 
-        JPanel topContainer = new JPanel(new BorderLayout());
-        topContainer.setPreferredSize(new Dimension(800, 420));
-        topContainer.add(topPanel);
+        add(topPanel, BorderLayout.NORTH);
 
-        add(topContainer, BorderLayout.NORTH);
+        // Panel de tabla principal
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        tablaCarga = new JTable(new DefaultTableModel());
+        JScrollPane scrollPane = new JScrollPane(tablaCarga);
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+        add(centerPanel, BorderLayout.CENTER);
 
-        // Panel inferior (tabla de verificación)
+        // Panel inferior con barra de progreso y estado
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        verifyButton = new JButton("Verificar Producto");
+        JPanel progressPanel = new JPanel(new FlowLayout());
+        progressBar = new JProgressBar();
+        progressBar.setStringPainted(true);
+        lblEstado = new JLabel("Esperando actualización...");
+        
         btnIncrementarPrecio = new JButton("Actualizar Precio");
-        tablaVerificacion = new JTable();
-
-        JPanel buttonPanel = new JPanel(new FlowLayout());
-        buttonPanel.add(verifyButton);
-        buttonPanel.add(btnIncrementarPrecio);
-
-        bottomPanel.add(new JScrollPane(tablaVerificacion), BorderLayout.CENTER);
-        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
-
-        JPanel bottomContainer = new JPanel(new BorderLayout());
-        bottomContainer.setPreferredSize(new Dimension(800, 180));
-        bottomContainer.add(bottomPanel);
-
-        add(bottomContainer, BorderLayout.CENTER);
+        progressPanel.add(btnIncrementarPrecio);
+        progressPanel.add(progressBar);
+        progressPanel.add(lblEstado);
+        bottomPanel.add(progressPanel, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
 
         // Acciones de los botones
-        btnCarga.addActionListener(e -> new CargaDeDatos(tablaCarga).execute());
-        verifyButton.addActionListener(e -> new VerificadorDeProducto(tablaVerificacion).execute());
-        btnIncrementarPrecio.addActionListener(e -> new ActualizadorDePrecio().execute());
+        btnCargarDatos.addActionListener(e -> cargarDatosCriterio());
+        btnIncrementarPrecio.addActionListener(e -> iniciarActualizacion());
+
+        // Cargar IDs en el ComboBox
+        rbtnTienda.addActionListener(e -> cargarIds("IDTIENDA"));
+        rbtnEmpleado.addActionListener(e -> cargarIds("IDEMPLEADO"));
+        rbtnCiudad.addActionListener(e -> cargarIds("IDCIUDAD"));
     }
+
+    private String getSelectedCriterio() {
+        if (rbtnTienda.isSelected()) return "IDTIENDA";
+        if (rbtnEmpleado.isSelected()) return "IDEMPLEADO";
+        if (rbtnCiudad.isSelected()) return "IDCIUDAD";
+        return null;
+    }
+
+    private void cargarIds(String criterio) {
+        comboBoxCriterio.removeAllItems();
+        try (Connection connection = ConexionBD.getConnection();
+             PreparedStatement stmt = connection.prepareStatement("SELECT DISTINCT " + criterio + " FROM TICKETSH")) {
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                comboBoxCriterio.addItem(rs.getInt(1));
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar IDs: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void iniciarActualizacion() {
+        String criterio = getSelectedCriterio();
+        Integer criterioId = (Integer) comboBoxCriterio.getSelectedItem();
+        if (criterio == null || criterioId == null) {
+            JOptionPane.showMessageDialog(this, "Debe seleccionar un criterio y un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        new ActualizadorDePrecio(criterio, criterioId, progressBar, lblEstado).execute();
+    }
+    private void cargarDatosCriterio() {
+        String criterio = getSelectedCriterio();
+        Integer criterioId = (Integer) comboBoxCriterio.getSelectedItem();
+    
+        if (criterio == null || criterioId == null) {
+            JOptionPane.showMessageDialog(this, "Debe seleccionar un criterio y un ID válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+    
+        new CargaDeDatos(tablaCarga, criterio, criterioId).execute();
+    }
+    
 }
