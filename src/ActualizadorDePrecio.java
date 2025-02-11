@@ -51,19 +51,18 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Integer> {
             
             String query = "SELECT DISTINCT IDPRODUCTO FROM TICKETSD " +
                            "JOIN TICKETSH ON TICKETSD.FOLIO = TICKETSH.FOLIO " +
-                           "WHERE TICKETSH." + criterio + " = ?";
+                           "WHERE TICKETSH." + criterio + " = ?"; 
+                           
     
             try (PreparedStatement stmt = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
                 stmt.setInt(1, criterioId);
                 ResultSet rs = stmt.executeQuery();
                 
-                // Obtener el total de productos para la barra de progreso
-                rs.last(); // Mueve el cursor al último registro
-                int totalProductos = rs.getRow(); // Obtiene el número total de filas
+                rs.last(); 
+                int totalProductos = rs.getRow(); 
                 progressBar.setMaximum(totalProductos);
-                rs.beforeFirst(); // Regresar el cursor al inicio
+                rs.beforeFirst(); 
     
-                // Actualizar productos uno por uno
                 int progress = 0;
                 while (rs.next()) {
                     int idProducto = rs.getInt("IDPRODUCTO");
@@ -102,7 +101,6 @@ public class ActualizadorDePrecio extends SwingWorker<Void, Integer> {
         dialog.setLocationRelativeTo(null);
         dialog.add(new JLabel("Actualizando precios...", JLabel.CENTER), BorderLayout.NORTH);
         
-        // Verificar si progressBar no es null antes de usarlo
         if (progressBar != null) {
             progressBar.setIndeterminate(false);
             progressBar.setValue(0);
